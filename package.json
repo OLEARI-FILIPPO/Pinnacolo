@@ -7,6 +7,7 @@
     "dev": "npm-run-all -p dev:frontend dev:backend",
     "dev:frontend": "npm --prefix frontend start",
     "dev:backend": "npm --prefix backend run start:dev",
+    "start": "npm --prefix backend run start:prod",
     "build": "npm-run-all build:shared build:backend build:frontend",
     "build:shared": "npm --prefix packages/shared run build",
     "build:backend": "npm --prefix backend run build",

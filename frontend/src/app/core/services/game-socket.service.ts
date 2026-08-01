@@ -1,5 +1,6 @@
 import { Injectable, signal } from '@angular/core';
 import { io, Socket } from 'socket.io-client';
+import { environment } from '../../../../environments/environment';
 
 export type CardSuit = 'clubs' | 'diamonds' | 'hearts' | 'spades' | 'joker';
 
@@ -95,7 +96,7 @@ export type HandSortMode = 'rank-asc' | 'rank-desc' | 'suit';
 @Injectable({ providedIn: 'root' })
 export class GameSocketService {
   private socket: Socket | null = null;
-  private readonly baseUrl = 'http://localhost:3000';
+  private readonly baseUrl = environment.apiUrl;
 
   readonly connected = signal(false);
   readonly latestError = signal<string | null>(null);

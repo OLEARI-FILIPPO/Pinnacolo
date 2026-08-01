@@ -1,0 +1,14 @@
+node_modules/
+coverage/
+dist/
+.env
+.env.*
+
+frontend/node_modules/
+frontend/dist/
+
+backend/node_modules/
+backend/dist/
+
+packages/shared/node_modules/
+packages/shared/dist/

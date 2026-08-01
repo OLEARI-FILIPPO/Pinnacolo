@@ -1,0 +1,29 @@
+{
+  "name": "pinnacolo",
+  "version": "1.0.0",
+  "description": "Pinnacolo Reggiano online - Angular + NestJS",
+  "private": true,
+  "scripts": {
+    "dev": "npm-run-all -p dev:frontend dev:backend",
+    "dev:frontend": "npm --prefix frontend start",
+    "dev:backend": "npm --prefix backend run start:dev",
+    "build": "npm-run-all build:shared build:backend build:frontend",
+    "build:shared": "npm --prefix packages/shared run build",
+    "build:backend": "npm --prefix backend run build",
+    "build:frontend": "npm --prefix frontend run build",
+    "test": "npm-run-all test:backend test:frontend",
+    "test:backend": "npm --prefix backend run test",
+    "test:frontend": "npm --prefix frontend run test -- --watch=false --browsers=ChromeHeadless"
+  },
+  "workspaces": [
+    "frontend",
+    "backend",
+    "packages/shared"
+  ],
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "npm-run-all": "^4.1.5"
+  }
+}

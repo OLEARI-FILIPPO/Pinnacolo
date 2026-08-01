@@ -91,6 +91,11 @@ export interface TableNoticeView {
   displayName: string;
 }
 
+export interface TableDeletedView {
+  tableId: string;
+  message: string;
+}
+
 export type HandSortMode = 'rank-asc' | 'rank-desc' | 'suit';
 
 @Injectable({ providedIn: 'root' })
@@ -102,6 +107,7 @@ export class GameSocketService {
   readonly connected = signal(false);
   readonly latestError = signal<string | null>(null);
   readonly latestNotice = signal<TableNoticeView | null>(null);
+  readonly deletedTable = signal<TableDeletedView | null>(null);
   readonly tables = signal<TableSummaryView[]>([]);
   readonly table = signal<TableStateView | null>(null);
   readonly sortMode = signal<HandSortMode>('rank-asc');
@@ -132,6 +138,13 @@ export class GameSocketService {
     this.socket.on('tables:update', (payload: TableSummaryView[]) => this.tables.set(payload));
     this.socket.on('table:update', (payload: TableStateView) => this.table.set(payload));
     this.socket.on('table:notice', (payload: TableNoticeView) => this.latestNotice.set(payload));
+    this.socket.on('table:deleted', (payload: TableDeletedView) => {
+      if (this.table()?.tableId === payload.tableId) {
+        this.table.set(null);
+      }
+      this.deletedTable.set(payload);
+      this.latestError.set(payload.message);
+    });
     this.socket.on('command:error', (payload: { message: string }) => {
       this.latestError.set(payload.message);
     });
@@ -179,6 +192,17 @@ export class GameSocketService {
       }
     });
     this.socket?.emit('table:state', { tableId });
+    this.socket?.emit('tables:list');
+  }
+
+  deleteTable(tableId: string, playerId: string) {
+    this.latestError.set(null);
+    this.deletedTable.set(null);
+    this.socket?.emit('table:delete', { tableId, playerId }, (response: { ok: boolean; error?: string }) => {
+      if (!response?.ok && response?.error) {
+        this.latestError.set(response.error);
+      }
+    });
     this.socket?.emit('tables:list');
   }
 

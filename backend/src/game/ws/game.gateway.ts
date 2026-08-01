@@ -258,6 +258,35 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     return { ok: true };
   }
 
+  @SubscribeMessage('table:delete')
+  onDeleteTable(@ConnectedSocket() client: Socket, @MessageBody() body: { tableId: string; playerId: string }) {
+    const table = this.tables.get(body.tableId);
+    if (!table) {
+      return { ok: false, error: 'Table not found' };
+    }
+
+    if (table.ownerPlayerId !== body.playerId) {
+      return { ok: false, error: 'Only table owner can delete the table' };
+    }
+
+    const timer = this.botTimers.get(body.tableId);
+    if (timer) {
+      clearTimeout(timer);
+      this.botTimers.delete(body.tableId);
+    }
+
+    this.server.to(body.tableId).emit('table:deleted', {
+      tableId: body.tableId,
+      message: `Il tavolo ${body.tableId} e stato eliminato`,
+    });
+    this.server.in(body.tableId).socketsLeave(body.tableId);
+    this.tables.delete(body.tableId);
+    client.data['tableId'] = undefined;
+
+    this.broadcastTables();
+    return { ok: true };
+  }
+
   @SubscribeMessage('table:state')
   onTableState(@ConnectedSocket() client: Socket, @MessageBody() body: { tableId: string }) {
     const table = this.tables.get(body.tableId);

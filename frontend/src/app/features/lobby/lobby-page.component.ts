@@ -61,6 +61,14 @@ import { GameSocketService } from '../../core/services/game-socket.service';
               >
                 Avvia
               </button>
+              <button
+                type="button"
+                class="danger"
+                (click)="deleteTable(table.tableId)"
+                [disabled]="!isOwner(table.ownerPlayerId)"
+              >
+                Elimina
+              </button>
             </div>
           </article>
         </div>
@@ -186,6 +194,10 @@ import { GameSocketService } from '../../core/services/game-socket.service';
         background: #2a4f67;
       }
 
+      button.danger {
+        background: #8a2e2e;
+      }
+
       button:disabled {
         opacity: 0.5;
         cursor: not-allowed;
@@ -259,6 +271,14 @@ export class LobbyPageComponent {
 
   startTable(tableId: string) {
     this.socket.startTable(tableId, this.playerId);
+  }
+
+  deleteTable(tableId: string) {
+    if (!confirm(`Eliminare il tavolo ${tableId}?`)) {
+      return;
+    }
+
+    this.socket.deleteTable(tableId, this.playerId);
   }
 
   isOwner(ownerPlayerId: string | null) {

@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, computed, effect, signal } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import {
   GameCardView,
   GameStateView,
@@ -1002,7 +1002,7 @@ export class TablePageComponent {
     return `Carta del pozzo obbligatoria: devi usare ${required.label}${this.suitLabel(required.suit)} in una combinazione prima di poter scartare.`;
   });
 
-  constructor(route: ActivatedRoute, readonly socket: GameSocketService) {
+  constructor(route: ActivatedRoute, readonly socket: GameSocketService, private readonly router: Router) {
     this.tableId = route.snapshot.paramMap.get('tableId') ?? 'unknown';
     this.playerId = route.snapshot.queryParamMap.get('playerId') ?? 'p1';
     const displayName = localStorage.getItem('pinnacolo-display-name') ?? this.playerId;
@@ -1025,6 +1025,16 @@ export class TablePageComponent {
       this.noticeTimer = setTimeout(() => {
         this.tableNotice.set(null);
       }, 4000);
+    });
+
+    effect(() => {
+      const deleted = this.socket.deletedTable();
+      if (!deleted || deleted.tableId !== this.tableId) {
+        return;
+      }
+
+      this.tableNotice.set(deleted.message);
+      void this.router.navigate(['/']);
     });
   }
 

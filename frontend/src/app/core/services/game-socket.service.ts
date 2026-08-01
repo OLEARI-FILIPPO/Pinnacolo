@@ -1,6 +1,6 @@
 import { Injectable, signal } from '@angular/core';
 import { io, Socket } from 'socket.io-client';
-import { environment } from '../../../../environments/environment';
+import { environment } from '../../../environments/environment';
 
 export type CardSuit = 'clubs' | 'diamonds' | 'hearts' | 'spades' | 'joker';
 

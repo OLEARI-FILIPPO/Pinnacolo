@@ -1,0 +1,10 @@
+[build]
+  base = "."
+  command = "npm --workspace frontend run build -- --configuration production"
+  publish = "frontend/dist/browser"
+
+# Disabilitare il plugin Angular di Netlify
+[[plugins]]
+package = "@netlify/angular-runtime"
+  [plugins.inputs]
+    enabled = false

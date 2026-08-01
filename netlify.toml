@@ -1,4 +1,4 @@
 [build]
-  base = "."
-  command = "npm --workspace frontend run build -- --configuration production"
-  publish = "frontend/dist/browser"
+  base = "frontend"
+  command = "npm run build -- --configuration production"
+  publish = "dist/browser"

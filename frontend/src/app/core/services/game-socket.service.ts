@@ -110,12 +110,17 @@ export class GameSocketService {
       return;
     }
 
-    this.socket = io(`${this.baseUrl}/game`, {
-      transports: ['websocket'],
-    });
+    this.socket = io(`${this.baseUrl}/game`);
 
-    this.socket.on('connect', () => this.connected.set(true));
+    this.socket.on('connect', () => {
+      this.connected.set(true);
+      this.latestError.set(null);
+    });
     this.socket.on('disconnect', () => this.connected.set(false));
+    this.socket.on('connect_error', () => {
+      this.connected.set(false);
+      this.latestError.set('Connessione al server non riuscita');
+    });
     this.socket.on('tables:update', (payload: TableSummaryView[]) => this.tables.set(payload));
     this.socket.on('table:update', (payload: TableStateView) => this.table.set(payload));
     this.socket.on('table:notice', (payload: TableNoticeView) => this.latestNotice.set(payload));

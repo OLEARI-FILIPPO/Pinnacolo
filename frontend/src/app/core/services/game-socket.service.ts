@@ -97,6 +97,7 @@ export type HandSortMode = 'rank-asc' | 'rank-desc' | 'suit';
 export class GameSocketService {
   private socket: Socket | null = null;
   private readonly baseUrl = environment.apiUrl;
+  private connectErrorCount = 0;
 
   readonly connected = signal(false);
   readonly latestError = signal<string | null>(null);
@@ -110,16 +111,23 @@ export class GameSocketService {
       return;
     }
 
-    this.socket = io(`${this.baseUrl}/game`);
+    this.socket = io(`${this.baseUrl}/game`, {
+      transports: ['websocket', 'polling'],
+    });
 
     this.socket.on('connect', () => {
+      this.connectErrorCount = 0;
       this.connected.set(true);
       this.latestError.set(null);
+      this.socket?.emit('tables:list');
     });
     this.socket.on('disconnect', () => this.connected.set(false));
     this.socket.on('connect_error', () => {
+      this.connectErrorCount += 1;
       this.connected.set(false);
-      this.latestError.set('Connessione al server non riuscita');
+      if (this.connectErrorCount >= 2) {
+        this.latestError.set('Connessione al server non riuscita, riprovo...');
+      }
     });
     this.socket.on('tables:update', (payload: TableSummaryView[]) => this.tables.set(payload));
     this.socket.on('table:update', (payload: TableStateView) => this.table.set(payload));

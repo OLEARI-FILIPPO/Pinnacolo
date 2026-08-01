@@ -10,12 +10,12 @@ MVP iniziale per un gioco online del Pinnacolo Reggiano a 19 carte.
 ## Avvio sviluppo
 1. Installare dipendenze root: `npm install`
 2. Avviare frontend + backend: `npm run dev`
-3. Frontend: http://localhost:4200
-4. Backend: http://localhost:3000
-5. Health check backend: http://localhost:3000/health
+3. Frontend pubblico: https://pinnacoloreggiano.netlify.app/
+4. Backend pubblico: https://pinnacoloreggianoservice.onrender.com
+5. Health check backend: https://pinnacoloreggianoservice.onrender.com/health
 
 ## Prima partita locale (MVP)
-1. Aprire il browser su http://localhost:4200
+1. Aprire il browser su https://pinnacoloreggiano.netlify.app/
 2. Inserire un codice tavolo (es. reggio-01)
 3. Premere Entra e avvia partita
 4. Il sistema crea automaticamente 3 bot e distribuisce le carte

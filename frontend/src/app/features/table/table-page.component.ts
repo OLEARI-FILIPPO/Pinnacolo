@@ -53,14 +53,6 @@ import {
               <p>{{ game.turnPlayerId === player.playerId ? 'In turno' : (player.isBot ? 'BOT' : 'YOU') }} - {{ player.hand.length }} carte</p>
               <div class="bot-move" *ngIf="isLastMoveBy(game, player.playerId)">
                 <span class="move-icon">{{ lastMoveIcon(game) }}</span>
-                <div class="cards-row" *ngIf="lastMoveCards(game).length > 0">
-                  <img
-                    class="card-image micro"
-                    *ngFor="let card of lastMoveCards(game)"
-                    [src]="cardImage(card, true)"
-                    [alt]="card.label + ' ' + suitLabel(card.suit)"
-                  />
-                </div>
               </div>
               <div class="back-cards" *ngIf="player.playerId !== playerId">
                 <img class="card-back-mini" *ngFor="let _ of previewBackCards(player.hand.length)" [src]="cardBackImage()" alt="Retro carta" />

@@ -14,6 +14,11 @@ MVP iniziale per un gioco online del Pinnacolo Reggiano a 19 carte.
 4. Backend pubblico: https://pinnacoloreggianoservice.onrender.com
 5. Health check backend: https://pinnacoloreggianoservice.onrender.com/health
 
+## Persistenza tavoli
+- Il backend salva lo stato tavoli su Postgres se e' presente la variabile ambiente `DATABASE_URL`.
+- Se `DATABASE_URL` non e' configurata, usa fallback locale su file (`.data/tables-state.json`).
+- Per deploy cloud conviene sempre configurare `DATABASE_URL` (Neon/Supabase/Render Postgres hanno piani gratuiti).
+
 ## Prima partita locale (MVP)
 1. Aprire il browser su https://pinnacoloreggiano.netlify.app/
 2. Inserire un codice tavolo (es. reggio-01)

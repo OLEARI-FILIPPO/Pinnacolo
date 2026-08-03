@@ -1,3 +1,4 @@
+import { OnModuleInit } from '@nestjs/common';
 import {
   ConnectedSocket,
   MessageBody,
@@ -7,10 +8,9 @@ import {
   WebSocketGateway,
   WebSocketServer,
 } from '@nestjs/websockets';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
 import { Server, Socket } from 'socket.io';
 import { GameEngineService } from '../engine/game-engine.service';
+import { TableStateStoreService } from '../persistence/table-state-store.service';
 import { GameCard, GameCommand, Meld, TableState } from '../domain/types';
 
 interface TableSummary {
@@ -31,21 +31,31 @@ interface TableSummary {
   },
   namespace: '/game',
 })
-export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect, OnModuleInit {
   @WebSocketServer()
   server!: Server;
 
-  private readonly persistenceFilePath = join(process.cwd(), '.data', 'tables-state.json');
   private tables = new Map<string, TableState>();
   private botTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private readonly minPlayersToStart = 2;
   private readonly maxPlayers = 4;
 
-  constructor(private readonly engine: GameEngineService) {
-    this.tables = this.loadPersistedTables();
+  constructor(
+    private readonly engine: GameEngineService,
+    private readonly tableStateStore: TableStateStoreService,
+  ) {}
+
+  async onModuleInit() {
+    await this.tableStateStore.initialize();
+    const persistedTables = await this.tableStateStore.loadTables();
+    this.tables = new Map<string, TableState>(persistedTables.map((table) => [table.tableId, table]));
+
     for (const table of this.tables.values()) {
       this.ensureTableScoreEntries(table);
       this.ensureTurnConstraints(table);
+      if (table.status === 'playing') {
+        this.scheduleBotTurn(table.tableId);
+      }
     }
   }
 
@@ -120,7 +130,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     this.broadcastTable(tableId);
     this.broadcastTables();
-    this.persistTables();
+    void this.persistTables();
     return { ok: true, tableId, playerId: ownerPlayerId };
   }
 
@@ -189,7 +199,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     this.broadcastTable(tableId);
     this.broadcastTables();
-    this.persistTables();
+    void this.persistTables();
     return { ok: true, tableId, playerId };
   }
 
@@ -228,7 +238,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     this.broadcastTable(table.tableId);
     this.broadcastTables();
-    this.persistTables();
+    void this.persistTables();
     return { ok: true };
   }
 
@@ -267,7 +277,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.scheduleBotTurn(table.tableId);
     this.broadcastTable(table.tableId);
     this.broadcastTables();
-    this.persistTables();
+    void this.persistTables();
     return { ok: true };
   }
 
@@ -297,7 +307,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     client.data['tableId'] = undefined;
 
     this.broadcastTables();
-    this.persistTables();
+    void this.persistTables();
     return { ok: true };
   }
 
@@ -342,7 +352,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       this.broadcastTable(body.tableId);
       this.broadcastTables();
-      this.persistTables();
+      void this.persistTables();
       return { ok: true };
     } catch (error) {
       client.emit('command:error', {
@@ -431,7 +441,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (table.status === 'playing') {
       this.scheduleBotTurn(tableId);
     }
-    this.persistTables();
+    void this.persistTables();
   }
 
   private ensureTableScoreEntries(table: TableState) {
@@ -481,36 +491,8 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
-  private loadPersistedTables() {
-    if (!existsSync(this.persistenceFilePath)) {
-      return new Map<string, TableState>();
-    }
-
-    try {
-      const raw = readFileSync(this.persistenceFilePath, 'utf8');
-      const parsed = JSON.parse(raw) as TableState[];
-      const map = new Map<string, TableState>();
-      for (const table of parsed) {
-        map.set(table.tableId, table);
-      }
-      return map;
-    } catch {
-      return new Map<string, TableState>();
-    }
-  }
-
-  private persistTables() {
-    try {
-      const folder = dirname(this.persistenceFilePath);
-      if (!existsSync(folder)) {
-        mkdirSync(folder, { recursive: true });
-      }
-
-      const payload = JSON.stringify([...this.tables.values()]);
-      writeFileSync(this.persistenceFilePath, payload, 'utf8');
-    } catch {
-      // Ignore persistence failures to keep gameplay responsive.
-    }
+  private async persistTables() {
+    await this.tableStateStore.saveTables([...this.tables.values()]);
   }
 
   private computeHandPartials(melds: Meld[], players: Array<{ playerId: string; hand: GameCard[] }>) {

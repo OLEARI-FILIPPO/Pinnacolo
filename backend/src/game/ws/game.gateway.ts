@@ -477,8 +477,8 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const base = meld.cards.reduce((acc, card) => acc + this.cardPoints(card), 0);
     const hasWildcard = meld.cards.some((card) => card.isJoker || card.isPinella);
     const lengthMultiplier = meld.cards.length >= 6 && !hasWildcard ? 2 : 1;
-    const pokerDiTreMultiplier = this.isPokerDiTre(meld) ? 2 : 1;
-    return base * lengthMultiplier * pokerDiTreMultiplier;
+    const pokerMultiplier = this.isPoker(meld) ? 2 : 1;
+    return base * lengthMultiplier * pokerMultiplier;
   }
 
   private cardPoints(card: GameCard) {
@@ -503,6 +503,10 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
 
     return 0;
+  }
+
+  private isPoker(meld: Meld) {
+    return meld.type === 'set' && meld.cards.length === 4;
   }
 
   private isPokerDiTre(meld: Meld) {

@@ -74,6 +74,7 @@ import {
             <h2>Punteggio attuale del tavolo</h2>
             <span>{{ scorePanelOpen() ? 'Nascondi' : 'Mostra' }}</span>
           </button>
+          <p class="badge turn-badge">Turno attuale: {{ playerDisplayName(game.turnPlayerId) }}</p>
           <div class="scores-grid" *ngIf="scorePanelOpen()">
             <article class="score-item" *ngFor="let row of tableScoreRows(table, game)">
               <h3>{{ playerDisplayName(row.playerId) }}</h3>
@@ -105,23 +106,29 @@ import {
             <h2>Pozzo</h2>
             <p class="instruction">Seleziona una carta del pozzo: prenderai quella e tutte le carte successive.</p>
 
-            <div class="discard-scroll" *ngIf="game.discardPile.length > 0; else noDiscard" (mouseleave)="clearDiscardHover()">
-              <div class="discard-stack" [style.height.px]="discardStackHeight(game.discardPile.length)">
+            <div class="discard-scroll" *ngIf="displayedDiscardPile(game).length > 0; else noDiscard" (mouseleave)="clearDiscardHover()">
+              <div class="discard-stack" [style.height.px]="discardStackHeight(displayedDiscardPile(game).length)">
                 <button
                   class="discard-pick"
-                  *ngFor="let card of game.discardPile; let i = index"
+                  *ngFor="let card of displayedDiscardPile(game); let i = index"
                   type="button"
-                  [class.top-card]="i === game.discardPile.length - 1"
+                  [class.top-card]="i === displayedDiscardPile(game).length - 1"
+                  [class.pending-card]="isPendingDiscardCard(card)"
                   [class.selected]="selectedDiscardCardId() === card.id"
                   [class.hovered]="hoveredDiscardIndex() === i"
                   [class.near-hover]="isNearHoveredDiscard(i)"
-                  [style.left.px]="discardOffset(i, game.discardPile.length)"
-                  [style.zIndex]="discardZIndex(i, game.discardPile.length)"
+                  [style.left.px]="discardOffset(i, displayedDiscardPile(game).length)"
+                  [style.zIndex]="discardZIndex(i, displayedDiscardPile(game).length)"
+                  [disabled]="isPendingDiscardCard(card)"
                   (click)="selectDiscardCard(card.id)"
                   (mouseenter)="setDiscardHover(i)"
                 >
-                  <img class="card-image compact discard-card-image" [src]="cardImage(card, true)" [alt]="card.label + ' ' + suitLabel(card.suit)" />
-                  <span class="top-label" *ngIf="i === game.discardPile.length - 1">Ultima</span>
+                  <img
+                    class="card-image compact discard-card-image"
+                    [src]="isPendingDiscardCard(card) ? cardBackImage() : cardImage(card, true)"
+                    [alt]="isPendingDiscardCard(card) ? 'Carta in attesa di scarto' : card.label + ' ' + suitLabel(card.suit)"
+                  />
+                  <span class="top-label" *ngIf="i === displayedDiscardPile(game).length - 1">{{ isPendingDiscardCard(card) ? 'Attesa' : 'Ultima' }}</span>
                 </button>
               </div>
             </div>
@@ -405,6 +412,10 @@ import {
         color: #deebff;
       }
 
+      .turn-badge {
+        margin: 10px 0 0;
+      }
+
       .final-hand-summary h2 {
         margin: 0 0 10px;
       }
@@ -500,6 +511,11 @@ import {
         transform: translateY(-8px) scale(1.14);
         box-shadow: 0 14px 20px #00000044;
         border-color: #f8e6cc;
+      }
+
+      .discard-pick.pending-card {
+        border-style: dashed;
+        border-color: #58b6ff99;
       }
 
       .discard-pick.near-hover {
@@ -1354,6 +1370,10 @@ export class TablePageComponent {
   }
 
   lastMoveCards(game: GameStateView) {
+    if (game.lastMove?.kind === 'draw-stock' && game.lastMove.playerId !== this.playerId) {
+      return [];
+    }
+
     const ids = game.lastMove?.cardIds ?? [];
     if (ids.length === 0) {
       return [];
@@ -1412,8 +1432,8 @@ export class TablePageComponent {
     const base = meld.cards.reduce((acc, card) => acc + this.cardPoints(card), 0);
     const hasWildcard = meld.cards.some((card) => card.isJoker || card.isPinella);
     const lengthMultiplier = meld.cards.length >= 6 && !hasWildcard ? 2 : 1;
-    const pokerDiTreMultiplier = this.isPokerDiTre(meld) ? 2 : 1;
-    return base * lengthMultiplier * pokerDiTreMultiplier;
+    const pokerMultiplier = this.isPoker(meld) ? 2 : 1;
+    return base * lengthMultiplier * pokerMultiplier;
   }
 
   scoreRows(game: GameStateView) {
@@ -1520,6 +1540,37 @@ export class TablePageComponent {
 
     const naturals = meld.cards.filter((card) => !card.isJoker && !card.isPinella);
     return naturals.length > 0 && naturals.every((card) => card.rank === 3);
+  }
+
+  private isPoker(meld: MeldView) {
+    return meld.type === 'set' && meld.cards.length === 4;
+  }
+
+  displayedDiscardPile(game: GameStateView) {
+    if (!this.shouldShowPendingDiscard(game)) {
+      return game.discardPile;
+    }
+
+    return [...game.discardPile, this.pendingDiscardCard(game)];
+  }
+
+  isPendingDiscardCard(card: GameCardView) {
+    return card.id.startsWith('pending-discard-');
+  }
+
+  private shouldShowPendingDiscard(game: GameStateView) {
+    return !game.finished && (game.phase === 'meld' || game.phase === 'discard');
+  }
+
+  private pendingDiscardCard(game: GameStateView): GameCardView {
+    return {
+      id: `pending-discard-${game.turnPlayerId}`,
+      rank: 0,
+      suit: 'spades',
+      label: '?',
+      isJoker: false,
+      isPinella: false,
+    };
   }
 
   private completeRunScore(meld: MeldView) {

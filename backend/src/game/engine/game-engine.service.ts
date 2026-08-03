@@ -26,10 +26,11 @@ export class GameEngineService {
     const hasSelectedStarter = Boolean(selectedStarter && normalizedPlayers.some((entry) => entry.playerId === selectedStarter));
 
     const stock = this.createShuffledDeck();
-    const dealtHands: GameCard[][] = [];
+    const dealtHands: GameCard[][] = Array.from({ length: playersCount }, () => []);
 
-    for (let i = 0; i < playersCount; i += 1) {
-      dealtHands.push(stock.splice(0, 19));
+    const cardsToDeal = stock.splice(0, 19 * playersCount);
+    for (let i = 0; i < cardsToDeal.length; i += 1) {
+      dealtHands[i % playersCount]?.push(cardsToDeal[i]);
     }
 
     const firstDiscard = stock.shift();

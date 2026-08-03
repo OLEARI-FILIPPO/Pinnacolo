@@ -103,6 +103,8 @@ export class GameSocketService {
   private socket: Socket | null = null;
   private readonly baseUrl = environment.apiUrl;
   private connectErrorCount = 0;
+  private keepAliveTimer: ReturnType<typeof setInterval> | null = null;
+  private currentSession: { tableId: string; playerId: string; displayName: string } | null = null;
 
   readonly connected = signal(false);
   readonly latestError = signal<string | null>(null);
@@ -126,6 +128,15 @@ export class GameSocketService {
       this.connected.set(true);
       this.latestError.set(null);
       this.socket?.emit('tables:list');
+
+      if (this.currentSession) {
+        this.socket?.emit('table:join', {
+          tableId: this.currentSession.tableId,
+          playerId: this.currentSession.playerId,
+          displayName: this.currentSession.displayName,
+        });
+        this.socket?.emit('table:state', { tableId: this.currentSession.tableId });
+      }
     });
     this.socket.on('disconnect', () => this.connected.set(false));
     this.socket.on('connect_error', () => {
@@ -150,10 +161,12 @@ export class GameSocketService {
     });
 
     this.socket.emit('tables:list');
+    this.startKeepAlive();
   }
 
   joinTable(tableId: string, playerId: string, displayName: string) {
     this.latestError.set(null);
+    this.currentSession = { tableId, playerId, displayName };
     this.socket?.emit('table:join', { tableId, playerId, displayName }, (response: { ok: boolean; error?: string }) => {
       if (!response?.ok && response?.error) {
         this.latestError.set(response.error);
@@ -203,6 +216,10 @@ export class GameSocketService {
         this.latestError.set(response.error);
       }
     });
+
+    if (this.currentSession?.tableId === tableId && this.currentSession.playerId === playerId) {
+      this.currentSession = null;
+    }
     this.socket?.emit('tables:list');
   }
 
@@ -309,5 +326,18 @@ export class GameSocketService {
 
   refreshTables() {
     this.socket?.emit('tables:list');
+  }
+
+  private startKeepAlive() {
+    if (this.keepAliveTimer) {
+      return;
+    }
+
+    this.keepAliveTimer = setInterval(() => {
+      this.socket?.emit('tables:list');
+      if (this.currentSession) {
+        this.socket?.emit('table:state', { tableId: this.currentSession.tableId });
+      }
+    }, 45_000);
   }
 }

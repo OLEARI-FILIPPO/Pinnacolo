@@ -44,6 +44,8 @@ export interface GameState {
   phase: TurnPhase;
   turnDrawnCardIds: string[];
   turnMustUseDiscardPickCardId: string | null;
+  turnMustReuseWildcardCardIds: string[];
+  turnMustReuseWildcardMeldId: string | null;
   lastMove: GameMove | null;
   stock: GameCard[];
   discardPile: GameCard[];

@@ -169,6 +169,7 @@ import {
                   </div>
                 </div>
                 <p class="meld-target-label" *ngIf="selectedTargetMeldId() === meld.id">Target aggiunta selezionato</p>
+                <p class="meld-target-label" *ngIf="mustReuseWildcardInMeld(game, meld.id)">Combinazione obbligatoria per riuso Pinella/Jolly</p>
               </article>
             </div>
             <ng-template #noMelds>
@@ -223,6 +224,7 @@ import {
 
           <p class="error-inline" *ngIf="socket.latestError()">{{ socket.latestError() }}</p>
           <p class="hint-inline" *ngIf="mandatoryUseHint() as hint">{{ hint }}</p>
+          <p class="hint-inline" *ngIf="wildcardReuseHint() as hint">{{ hint }}</p>
 
           <div class="selected-preview">
             <div class="cards-row selected-order-row" *ngIf="selectedCardsOrdered().length > 0; else emptySelectedPreview">
@@ -259,6 +261,7 @@ import {
               [class.drawn]="isDrawnCard(card.id)"
               [class.mandatory]="isMandatoryDiscardPickCard(card.id)"
               [class.suggested]="isSuggestedMandatoryCard(card.id)"
+              [class.required-reuse]="isRequiredWildcardReuseCard(card.id)"
               (click)="toggleSelection(card.id)"
             >
               <img class="card-image" [src]="cardImage(card, false)" [alt]="card.label + ' ' + suitLabel(card.suit)" />
@@ -854,6 +857,10 @@ import {
         box-shadow: 0 0 0 2px #6ac8ff;
       }
 
+      .selectable.required-reuse {
+        box-shadow: 0 0 0 3px #f08dff;
+      }
+
       .empty {
         opacity: 0.8;
       }
@@ -1010,6 +1017,25 @@ export class TablePageComponent {
     return `Carta del pozzo obbligatoria: devi usare ${required.label}${this.suitLabel(required.suit)} in una combinazione prima di poter scartare.`;
   });
 
+  readonly wildcardReuseHint = computed(() => {
+    const game = this.socket.table()?.game;
+    if (!game || game.turnPlayerId !== this.playerId || game.finished) {
+      return null;
+    }
+
+    if (!game.turnMustReuseWildcardMeldId || game.turnMustReuseWildcardCardIds.length === 0) {
+      return null;
+    }
+
+    const cards = this.humanHand().filter((card) => game.turnMustReuseWildcardCardIds.includes(card.id));
+    if (cards.length === 0) {
+      return null;
+    }
+
+    const labels = cards.map((card) => `${card.label}${this.suitLabel(card.suit)}`).join(', ');
+    return `Devi riutilizzare ${labels} nella combinazione obbligatoria selezionata.`;
+  });
+
   constructor(route: ActivatedRoute, readonly socket: GameSocketService, private readonly router: Router) {
     this.tableId = route.snapshot.paramMap.get('tableId') ?? 'unknown';
     this.playerId = route.snapshot.queryParamMap.get('playerId') ?? 'p1';
@@ -1043,6 +1069,21 @@ export class TablePageComponent {
 
       this.tableNotice.set(deleted.message);
       void this.router.navigate(['/']);
+    });
+
+    effect(() => {
+      const game = this.socket.table()?.game;
+      if (!game || !game.turnMustReuseWildcardMeldId) {
+        return;
+      }
+
+      const target = game.melds.find((meld) => meld.id === game.turnMustReuseWildcardMeldId);
+      if (!target) {
+        return;
+      }
+
+      this.selectedTargetMeldId.set(target.id);
+      this.selectedOwnerPlayerId.set(target.ownerPlayerId);
     });
   }
 
@@ -1337,6 +1378,15 @@ export class TablePageComponent {
     return this.mandatoryUseSuggestedCardIds().includes(cardId);
   }
 
+  isRequiredWildcardReuseCard(cardId: string) {
+    const game = this.socket.table()?.game;
+    return Boolean(game && game.turnPlayerId === this.playerId && game.turnMustReuseWildcardCardIds.includes(cardId));
+  }
+
+  mustReuseWildcardInMeld(game: GameStateView, meldId: string) {
+    return game.turnMustReuseWildcardMeldId === meldId && game.turnMustReuseWildcardCardIds.length > 0;
+  }
+
   isLastMoveBy(game: GameStateView, playerId: string) {
     return game.lastMove?.playerId === playerId;
   }
@@ -1523,15 +1573,6 @@ export class TablePageComponent {
     }
 
     return 0;
-  }
-
-  private isPokerDiTre(meld: MeldView) {
-    if (meld.type !== 'set' || meld.cards.length !== 4) {
-      return false;
-    }
-
-    const naturals = meld.cards.filter((card) => !card.isJoker && !card.isPinella);
-    return naturals.length > 0 && naturals.every((card) => card.rank === 3);
   }
 
   private isPoker(meld: MeldView) {

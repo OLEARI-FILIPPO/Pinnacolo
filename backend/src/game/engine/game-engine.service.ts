@@ -48,6 +48,8 @@ export class GameEngineService {
       phase: 'draw-or-pick',
       turnDrawnCardIds: [],
       turnMustUseDiscardPickCardId: null,
+      turnMustReuseWildcardCardIds: [],
+      turnMustReuseWildcardMeldId: null,
       lastMove: null,
       stock,
       discardPile: [firstDiscard],
@@ -86,6 +88,9 @@ export class GameEngineService {
       }
 
       if (command.type === 'play-meld') {
+        if (state.turnMustReuseWildcardCardIds.length > 0) {
+          throw new Error('Devi prima riutilizzare la Pinella/Jolly ripresa nella stessa combinazione');
+        }
         return this.playMeld(state, command.playerId, command.payload?.cardIds ?? []);
       }
 
@@ -95,6 +100,10 @@ export class GameEngineService {
     if (command.type === 'end-meld') {
       if (state.phase !== 'meld') {
         throw new Error('Cannot end meld outside meld phase');
+      }
+
+      if (state.turnMustReuseWildcardCardIds.length > 0) {
+        throw new Error('Devi prima riutilizzare la Pinella/Jolly ripresa nella stessa combinazione');
       }
 
       return {
@@ -131,6 +140,8 @@ export class GameEngineService {
       ...state,
       turnDrawnCardIds: [drawn.id],
       turnMustUseDiscardPickCardId: null,
+      turnMustReuseWildcardCardIds: [],
+      turnMustReuseWildcardMeldId: null,
       lastMove: {
         playerId,
         kind: 'draw-stock',
@@ -192,6 +203,8 @@ export class GameEngineService {
       ...state,
       turnDrawnCardIds: pickedCards.map((card) => card.id),
       turnMustUseDiscardPickCardId: selectedCard?.id ?? null,
+      turnMustReuseWildcardCardIds: [],
+      turnMustReuseWildcardMeldId: null,
       lastMove: {
         playerId,
         kind: 'pick-discard',
@@ -275,6 +288,17 @@ export class GameEngineService {
       throw new Error('Player not found');
     }
 
+    if (state.turnMustReuseWildcardCardIds.length > 0) {
+      if (!state.turnMustReuseWildcardMeldId || meldId !== state.turnMustReuseWildcardMeldId) {
+        throw new Error('Devi riutilizzare la Pinella/Jolly ripresa nella stessa combinazione');
+      }
+
+      const isUsingRequiredWildcard = state.turnMustReuseWildcardCardIds.some((id) => cardIds.includes(id));
+      if (!isUsingRequiredWildcard) {
+        throw new Error('Devi prima aggiungere la Pinella/Jolly ripresa alla combinazione obbligatoria');
+      }
+    }
+
     this.ensureDiscardPickCardIsUsedInAction(state, player, cardIds);
 
     const meld = state.melds.find((entry) => entry.id === meldId);
@@ -323,11 +347,14 @@ export class GameEngineService {
       nextWildcardAssignments = validated.wildcardAssignments;
 
       const nextHand = [...player.hand.filter((card) => card.id !== replacement.id), removedWildcard];
+      const pendingWildcardIds = this.computePendingWildcardIds(state, nextHand, [removedWildcard.id], meld.id);
       return {
         ...state,
         turnMustUseDiscardPickCardId: cardIds.includes(state.turnMustUseDiscardPickCardId ?? '')
           ? null
           : state.turnMustUseDiscardPickCardId,
+        turnMustReuseWildcardCardIds: pendingWildcardIds,
+        turnMustReuseWildcardMeldId: pendingWildcardIds.length > 0 ? meld.id : null,
         lastMove: {
           playerId,
           kind: 'attach-meld',
@@ -396,12 +423,16 @@ export class GameEngineService {
 
     const selectedSet = new Set(selectedCards.map((card) => card.id));
     const nextHand = [...player.hand.filter((card) => !selectedSet.has(card.id)), ...wildcardsTaken];
+    const newlyTakenWildcardIds = wildcardsTaken.map((card) => card.id);
+    const pendingWildcardIds = this.computePendingWildcardIds(state, nextHand, newlyTakenWildcardIds, meld.id);
 
     return {
       ...state,
       turnMustUseDiscardPickCardId: cardIds.includes(state.turnMustUseDiscardPickCardId ?? '')
         ? null
         : state.turnMustUseDiscardPickCardId,
+      turnMustReuseWildcardCardIds: pendingWildcardIds,
+      turnMustReuseWildcardMeldId: pendingWildcardIds.length > 0 ? meld.id : null,
       lastMove: {
         playerId,
         kind: 'attach-meld',
@@ -442,6 +473,10 @@ export class GameEngineService {
       throw new Error('Devi usare la carta scelta dal pozzo prima di scartare');
     }
 
+    if (state.turnMustReuseWildcardCardIds.length > 0) {
+      throw new Error('Devi prima riutilizzare la Pinella/Jolly ripresa nella stessa combinazione');
+    }
+
     if (currentPlayer.hand.length <= 0) {
       throw new Error('No cards to discard');
     }
@@ -475,6 +510,8 @@ export class GameEngineService {
         ...state,
         turnDrawnCardIds: [],
         turnMustUseDiscardPickCardId: null,
+        turnMustReuseWildcardCardIds: [],
+        turnMustReuseWildcardMeldId: null,
         lastMove: {
           playerId,
           kind: 'discard',
@@ -499,6 +536,8 @@ export class GameEngineService {
       ...state,
       turnDrawnCardIds: [],
       turnMustUseDiscardPickCardId: null,
+      turnMustReuseWildcardCardIds: [],
+      turnMustReuseWildcardMeldId: null,
       lastMove: {
         playerId,
         kind: 'discard',
@@ -509,6 +548,19 @@ export class GameEngineService {
       turnPlayerId: nextPlayer.playerId,
       phase: 'draw-or-pick',
     };
+  }
+
+  private computePendingWildcardIds(
+    state: GameState,
+    nextHand: GameCard[],
+    newlyTakenWildcardIds: string[],
+    meldId: string,
+  ) {
+    const currentRequired =
+      state.turnMustReuseWildcardMeldId === meldId ? state.turnMustReuseWildcardCardIds : [];
+    const combined = [...new Set([...currentRequired, ...newlyTakenWildcardIds])];
+    const handIds = new Set(nextHand.map((card) => card.id));
+    return combined.filter((id) => handIds.has(id));
   }
 
   private canUseCardInAnyCombination(state: GameState, playerId: PlayerId, hand: GameCard[], requiredCard: GameCard) {

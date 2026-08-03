@@ -46,6 +46,8 @@ export interface GameStateView {
   phase: 'draw-or-pick' | 'meld' | 'discard';
   turnDrawnCardIds: string[];
   turnMustUseDiscardPickCardId: string | null;
+  turnMustReuseWildcardCardIds: string[];
+  turnMustReuseWildcardMeldId: string | null;
   lastMove: GameMoveView | null;
   stock: GameCardView[];
   discardPile: GameCardView[];
